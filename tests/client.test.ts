@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VeridiaClient } from '../src/client';
 import { httpFetch } from '../src/http';
 
@@ -10,6 +10,7 @@ const credentials = { accessKeyId: 'key', secretAccessKey: 'secret' };
 
 describe('Veridia Client', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(httpFetch).mockResolvedValue({
       ok: true,
       status: 200,
@@ -36,6 +37,63 @@ describe('Veridia Client', () => {
     await client.flush();
 
     expect(httpFetch).toHaveBeenCalledWith(expect.stringContaining('/events'), expect.any(Object));
+  });
+
+  describe('automatic flushing', () => {
+    const smallBufferOptions = {
+      ...credentials,
+      maxBufferSize: 1,
+      maxBufferTimeMs: 25,
+    } as const;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.mocked(httpFetch).mockReset();
+      vi.mocked(httpFetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'success', data: [] }),
+      } as any);
+    });
+
+    afterEach(() => {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    });
+
+    it('flushes automatically when the buffer size limit is reached', async () => {
+      const client = new VeridiaClient(smallBufferOptions);
+
+      client.track('userId', 'auto-size', 'auto-event', 'evt-auto', new Date().toISOString(), {
+        amount: 1,
+      });
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      expect(httpFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/events'),
+        expect.any(Object),
+      );
+    });
+
+    it('flushes automatically once the buffer timer elapses', async () => {
+      const client = new VeridiaClient({
+        ...smallBufferOptions,
+        maxBufferSize: 2,
+      });
+
+      client.identify('userId', 'timer-user', { email: 'timer@example.com' });
+
+      expect(httpFetch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      expect(httpFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/profiles'),
+        expect.any(Object),
+      );
+    });
   });
 
   describe('getUserSegments', () => {
@@ -112,6 +170,77 @@ describe('Veridia Client', () => {
         'getUserSegments encountered an error',
         { error: abortError },
       );
+    });
+  });
+
+  describe('close', () => {
+    it('flushes pending identify and track buffers', async () => {
+      const client = new VeridiaClient({ ...credentials, maxBufferTimeMs: 60_000 });
+
+      client.identify('userId', 'u-close-1', { email: 'close@example.com' });
+      client.track(
+        'userId',
+        'u-close-1',
+        'purchase',
+        'evt-close-1',
+        new Date('2024-01-01T00:00:00.000Z').toISOString(),
+        { amount: 42 },
+      );
+
+      await client.close();
+
+      expect(httpFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/profiles'),
+        expect.any(Object),
+      );
+      expect(httpFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/events'),
+        expect.any(Object),
+      );
+      expect(httpFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears any pending flush timer when closing', async () => {
+      vi.useFakeTimers();
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+      const client = new VeridiaClient({ ...credentials, maxBufferTimeMs: 60_000 });
+
+      client.identify('userId', 'u-close-2', { email: 'close2@example.com' });
+
+      const scheduledTimer = setTimeoutSpy.mock.results[0]?.value as NodeJS.Timeout;
+      expect(scheduledTimer).toBeTruthy();
+
+      await client.close();
+
+      expect(clearTimeoutSpy.mock.calls.map(([timer]) => timer)).toContain(scheduledTimer);
+
+      setTimeoutSpy.mockRestore();
+      clearTimeoutSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('propagates errors when a flush fails during close', async () => {
+      const error = new Error('network down');
+      vi.mocked(httpFetch).mockRejectedValueOnce(error);
+
+      const client = new VeridiaClient({
+        ...credentials,
+        maxBufferTimeMs: 60_000,
+        retries: 1,
+      });
+
+      client.track(
+        'userId',
+        'u-close-3',
+        'purchase',
+        'evt-close-3',
+        new Date('2024-01-01T00:00:00.000Z').toISOString(),
+        { amount: 99 },
+      );
+
+      await expect(client.close()).rejects.toThrow(error);
     });
   });
 });
