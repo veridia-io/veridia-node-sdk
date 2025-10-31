@@ -1,0 +1,18 @@
+# Exclude dev files
+src/
+tests/
+tsconfig*.json
+vitest.config.ts
+.eslint*
+.prettier*
+.husky/
+.idea/
+node_modules/
+dist/**/*.tsbuildinfo
+eslint.config.js
+*.map
+
+# Include only built artifacts
+!dist/
+!LICENSE
+!README.md
