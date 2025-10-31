@@ -36,6 +36,7 @@ export type VeridiaClientOptions = {
   secretAccessKey: string;
   endpoint?: string; // default: https://api.veridia.io/v1
   region?: string; // default: "default"
+  autoFlush?: boolean; // default: true
   maxBufferSize?: number; // default: 500
   maxBufferTimeMs?: number; // default: 5000
   retries?: number; // default: 3

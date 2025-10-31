@@ -17,6 +17,7 @@ export class VeridiaClient {
   private readonly logger: VeridiaLogger | undefined;
   private readonly baseUrl: string;
   private readonly region: string;
+  private readonly autoFlush: boolean;
   private readonly maxBufferSize: number;
   private readonly maxBufferTimeMs: number;
   private readonly retries: number;
@@ -27,6 +28,7 @@ export class VeridiaClient {
   constructor(private readonly options: VeridiaClientOptions) {
     this.baseUrl = options.endpoint ?? 'https://api.veridia.io/v1';
     this.region = options.region ?? 'default';
+    this.autoFlush = options.autoFlush ?? true;
     this.maxBufferSize = options.maxBufferSize ?? 500;
     this.maxBufferTimeMs = options.maxBufferTimeMs ?? 5000;
     this.retries = options.retries ?? 3;
@@ -56,7 +58,7 @@ export class VeridiaClient {
       attributes,
     });
 
-    this.scheduleFlushIfNeeded('profiles', this.identifyBuffer);
+    if (this.autoFlush) this.scheduleFlushIfNeeded('profiles', this.identifyBuffer);
   }
 
   /**
@@ -85,7 +87,7 @@ export class VeridiaClient {
       properties,
     });
 
-    this.scheduleFlushIfNeeded('events', this.trackBuffer);
+    if (this.autoFlush) this.scheduleFlushIfNeeded('events', this.trackBuffer);
   }
 
   /**

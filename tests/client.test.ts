@@ -95,6 +95,32 @@ describe('Veridia Client', () => {
         expect.any(Object),
       );
     });
+
+    it('no automatic flush when the buffer size limit is reached', async () => {
+      const client = new VeridiaClient({ ...smallBufferOptions, autoFlush: false });
+
+      client.track('userId', 'auto-size', 'auto-event', 'evt-auto', new Date().toISOString(), {
+        amount: 1,
+      });
+
+      expect(httpFetch).not.toHaveBeenCalled();
+    });
+
+    it('no automatic flush once the buffer timer elapses', async () => {
+      const client = new VeridiaClient({
+        ...smallBufferOptions,
+        autoFlush: false,
+        maxBufferSize: 2,
+      });
+
+      client.identify('userId', 'timer-user', { email: 'timer@example.com' });
+
+      expect(httpFetch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      expect(httpFetch).not.toHaveBeenCalled();
+    });
   });
 
   it('retries flushes, logs failures, and only flushes newly queued data after recovery', async () => {
