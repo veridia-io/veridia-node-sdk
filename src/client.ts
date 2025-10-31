@@ -56,7 +56,7 @@ export class VeridiaClient {
       attributes,
     });
 
-    this.scheduleFlushIfNeeded(this.identifyBuffer);
+    this.scheduleFlushIfNeeded('profiles', this.identifyBuffer);
   }
 
   /**
@@ -85,7 +85,7 @@ export class VeridiaClient {
       properties,
     });
 
-    this.scheduleFlushIfNeeded(this.trackBuffer);
+    this.scheduleFlushIfNeeded('events', this.trackBuffer);
   }
 
   /**
@@ -171,11 +171,17 @@ export class VeridiaClient {
     await this.flush();
   }
 
-  private scheduleFlushIfNeeded(buffer: unknown[]): void {
+  private scheduleFlushIfNeeded(service: string, buffer: unknown[]): void {
     if (buffer.length >= this.maxBufferSize) {
-      void this.flush();
+      this.flush().catch((error) => {
+        this.logger?.error(service, 'automatic flush failed', { error });
+      });
     } else if (!this.flushTimer) {
-      this.flushTimer = setTimeout(() => this.flush(), this.maxBufferTimeMs);
+      this.flushTimer = setTimeout(() => {
+        this.flush().catch((error) => {
+          this.logger?.error(service, 'automatic flush failed', { error });
+        });
+      }, this.maxBufferTimeMs);
     }
   }
 
