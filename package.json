@@ -41,5 +41,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/veridia-io/veridia-node-sdk.git"
-  }
+  },
+  "license": "MIT"
 }
