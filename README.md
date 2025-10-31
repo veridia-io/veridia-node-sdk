@@ -1,7 +1,9 @@
 # Veridia Node SDK
 
-Official Node.js SDK for integrating with [Veridia Platform](https://veridia.io).  
-It provides an easy way to send user identification and tracking data, retrieve user segments, and integrate Veridia into your backend systems.
+[![npm version](https://img.shields.io/npm/v/@veridia/node-sdk.svg)](https://www.npmjs.com/package/@veridia/node-sdk)
+
+Official Node.js SDK for integrating with the [Veridia Platform](https://veridia.io).  
+It provides an easy way to identify users, send tracking events, retrieve user segments, and manage batching with retries and timeouts — all from your backend.
 
 ---
 
@@ -55,7 +57,8 @@ const client = new VeridiaClient({
 
 ### `identify(identifierType, identifierId, attributes)`
 
-Identify a user and update their profile attributes. Provided attributes must match the Profile Attributes schema defined in the Veridia dashboard.
+Identify a user and update their profile attributes.
+Provided attributes must match the Profile Attributes schema defined in your Veridia dashboard.
 
 ```ts
 await client.identify('userId', '123', {
@@ -65,17 +68,18 @@ await client.identify('userId', '123', {
 });
 ```
 
-| Parameter        | Type                    | Description                  |
-| ---------------- | ----------------------- | ---------------------------- |
-| `identifierType` | `"userId"` \| `"email"` | How the user is identified.  |
-| `identifierId`   | `string`                | The unique identifier value. |
-| `attributes`     | `Record<string, any>`   | Arbitrary user attributes.   |
+| Parameter        | Type                    | Description                 |
+| ---------------- | ----------------------- | --------------------------- |
+| `identifierType` | `"userId"` \| `"email"` | How the user is identified. |
+| `identifierId`   | `string`                | Unique identifier value.    |
+| `attributes`     | `Record<string, any>`   | Arbitrary user attributes.  |
 
 ---
 
 ### `track(identifierType, identifierId, eventType, eventId, eventTime, properties)`
 
-Track an event performed by a user. Provided attributes must match the event attributes schema defined in the Veridia dashboard.
+Track an event performed by a user.
+Provided attributes must match the event attributes schema defined in your Veridia dashboard.
 
 ```ts
 await client.track('userId', '123', 'purchase', 'evt-001', new Date().toISOString(), {
@@ -84,25 +88,33 @@ await client.track('userId', '123', 'purchase', 'evt-001', new Date().toISOStrin
 });
 ```
 
-| Parameter        | Type                    | Description                         |
-| ---------------- | ----------------------- | ----------------------------------- |
-| `identifierType` | `"userId"` \| `"email"` | How the user is identified.         |
-| `identifierId`   | `string`                | Unique identifier for the user.     |
-| `eventType`      | `string`                | Event type as in Veridia dashboard. |
-| `eventId`        | `string`                | Unique event ID for idempotency.    |
-| `eventTime`      | `string`                | ISO timestamp string.               |
-| `properties`     | `Record<string, any>`   | Optional event properties.          |
+| Parameter        | Type                    | Description                      |
+| ---------------- | ----------------------- | -------------------------------- |
+| `identifierType` | `"userId"` \| `"email"` | How the user is identified.      |
+| `identifierId`   | `string`                | Unique user identifier.          |
+| `eventType`      | `string`                | Logical name of the event.       |
+| `eventId`        | `string`                | Unique event ID for idempotency. |
+| `eventTime`      | `string`                | ISO timestamp string.            |
+| `properties`     | `Record<string, any>`   | Optional event properties.       |
 
 ---
 
-### `getUserSegments(identifierType, identifierId)`
+### `getUserSegments(identifierType, identifierId, [noSegmentsOnError=true])`
 
 Fetches the list of segments the specified user currently belongs to.
+If the API call fails and `noSegmentsOnError` is set to `false`, it will throw an error.
+Otherwise, it will return an empty array.
 
 ```ts
 const segments = await client.getUserSegments('userId', '123');
 console.log(segments); // ['617090ac-a1f6-4c70-a79e-40830a367324', '67f2c139-850f-469f-9ca4-a1c58e6d84ea']
 ```
+
+| Parameter           | Type       | Default   | Description                                         |
+| ------------------- | ---------- | --------- | --------------------------------------------------- | ------------------------ |
+| `identifierType`    | `"userId"` | `"email"` | —                                                   | Type of user identifier. |
+| `identifierId`      | `string`   | —         | Unique user ID or email.                            |
+| `noSegmentsOnError` | `boolean`  | `true`    | If true, returns `[]` instead of throwing an error. |
 
 Returns:
 `Promise<string[]>` — Array of segment identifiers.
@@ -112,6 +124,7 @@ Returns:
 ### `flush()`
 
 Immediately sends all queued identify and track data.
+Automatically called when buffers reach their configured limits or after the flush interval.
 
 ```ts
 await client.flush();
@@ -119,8 +132,8 @@ await client.flush();
 
 ### `close()`
 
-Flushes all pending data and prepares the client for shutdown.
-Call this before process exit in background workers or serverless functions.
+Flushes any remaining buffered data and closes the client gracefully.
+Call this before application exit in workers or serverless environments.
 
 ```ts
 await client.close();
@@ -130,31 +143,39 @@ await client.close();
 
 ## ⚙️ Configuration Options
 
-| Option                     | Type            | Default                     | Description                            |
-| -------------------------- | --------------- | --------------------------- | -------------------------------------- |
-| `accessKeyId`              | `string`        | —                           | Veridia API access key ID              |
-| `secretAccessKey`          | `string`        | —                           | Veridia API secret                     |
-| `endpoint`                 | `string`        | `https://api.veridia.io/v1` | API base URL                           |
-| `region`                   | `string`        | `"default"`                 | API region                             |
-| `maxBufferSize`            | `number`        | `500`                       | Max number of items before auto-flush  |
-| `maxBufferTimeMs`          | `number`        | `5000`                      | Max time before auto-flush             |
-| `retries`                  | `number`        | `3`                         | Retry attempts on transient errors     |
-| `timeoutMsGetUserSegments` | `number`        | `5000`                      | Timeout for `getUserSegments` requests |
-| `timeoutMsFlush`           | `number`        | `30000`                     | Timeout for batch flush                |
-| `logger`                   | `VeridiaLogger` | —                           | Custom logger implementation           |
+| Option                     | Type            | Default                     | Description                                   |
+| -------------------------- | --------------- | --------------------------- | --------------------------------------------- |
+| `accessKeyId`              | `string`        | —                           | Veridia API access key ID.                    |
+| `secretAccessKey`          | `string`        | —                           | Veridia API secret.                           |
+| `endpoint`                 | `string`        | `https://api.veridia.io/v1` | API base URL.                                 |
+| `region`                   | `string`        | `"default"`                 | API region.                                   |
+| `autoFlush`                | `boolean`       | `true`                      | Whether to automatically flush buffered data. |
+| `maxBufferSize`            | `number`        | `500`                       | Max number of items before auto-flush.        |
+| `maxBufferTimeMs`          | `number`        | `5000`                      | Max time (ms) before auto-flush.              |
+| `retries`                  | `number`        | `3`                         | Retry attempts on transient network errors.   |
+| `retryBaseDelayMs`         | `number`        | `500`                       | Base delay (ms) for exponential backoff.      |
+| `timeoutMsGetUserSegments` | `number`        | `5000`                      | Timeout (ms) for `getUserSegments` calls.     |
+| `timeoutMsFlush`           | `number`        | `30000`                     | Timeout (ms) for batch flush requests.        |
+| `logger`                   | `VeridiaLogger` | —                           | Custom logger implementation.                 |
 
 ---
 
 ## 🧾 Logger Interface
 
-The SDK supports pluggable logging.
 You can integrate your own logger (e.g. Pino, Winston, Bunyan) by providing the following interface:
 
 ```ts
 interface VeridiaLogger {
-  info(service: string, message: string, context?: unknown): void;
-  warn(service: string, message: string, context?: unknown): void;
-  error(service: string, message: string, context?: unknown): void;
+  info?(service: string, message: string, context?: VeridiaLogContext): void;
+  warn?(service: string, message: string, context?: VeridiaLogContext): void;
+  error(service: string, message: string, context?: VeridiaLogContext): void;
+}
+
+interface VeridiaLogContext {
+  status?: number;
+  error?: unknown;
+  data?: unknown;
+  [key: string]: unknown;
 }
 ```
 
@@ -179,8 +200,8 @@ const client = new VeridiaClient({
 
 ## 🧩 TypeScript Support
 
-The SDK ships with full `.d.ts` declarations and JSDoc for IntelliSense.
-Hover over any method in VS Code to see inline documentation and parameter hints.
+The SDK ships with full `.d.ts` declarations and JSDoc documentation.
+Hover over any method in VS Code to see inline descriptions and parameter hints.
 
 ---
 
@@ -198,6 +219,9 @@ const client = new VeridiaClient({
 await client.identify('userId', '123', { plan: 'gold' });
 await client.track('userId', '123', 'purchase', 'evt-123', new Date().toISOString());
 await client.flush();
+
+const segments = await client.getUserSegments('userId', '123');
+console.log('Segments:', segments);
 ```
 
 ---
