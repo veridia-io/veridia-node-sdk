@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "npm pkg get version | xargs -I {} sed -i '' \"s/__SDK_VERSION__/{}/\" src/version.ts && npm run build:cjs && npm run build:esm",
+    "build": "npm pkg get version | xargs -I {} sh -c \"sed -i.bak -e 's/__SDK_VERSION__/{}/g' src/version.ts && rm -f src/version.ts.bak\" && npm run build:cjs && npm run build:esm",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "clean": "rm -rf dist",
