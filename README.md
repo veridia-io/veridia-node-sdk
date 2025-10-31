@@ -111,8 +111,8 @@ console.log(segments); // ['617090ac-a1f6-4c70-a79e-40830a367324', '67f2c139-850
 ```
 
 | Parameter           | Type       | Default   | Description                                         |
-| ------------------- | ---------- | --------- | --------------------------------------------------- | ------------------------ |
-| `identifierType`    | `"userId"` | `"email"` | —                                                   | Type of user identifier. |
+| ------------------- | ---------- | --------- | --------------------------------------------------- |
+| `identifierType`    | `"userId"` | `"email"` | Type of user identifier.                            |
 | `identifierId`      | `string`   | —         | Unique user ID or email.                            |
 | `noSegmentsOnError` | `boolean`  | `true`    | If true, returns `[]` instead of throwing an error. |
 
