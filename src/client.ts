@@ -95,11 +95,13 @@ export class VeridiaClient {
    *
    * @param identifierType - The type of user identifier ("userId" | "email").
    * @param identifierId - The unique ID or email.
+   * @param [noSegmentsOnError=true] - Whether to throw an error or to return empty array of segments. Defaults to true.
    * @returns A list of segment identifiers the user currently belongs to.
    */
   public async getUserSegments(
     identifierType: IdentifierPayload['type'],
     identifierId: string,
+    noSegmentsOnError = true,
   ): Promise<string[]> {
     try {
       const path = `/segments/${identifierType}/${encodeURIComponent(identifierId)}`;
@@ -128,7 +130,8 @@ export class VeridiaClient {
       if (!res.ok) {
         this.logger?.error('segments', 'getUserSegments API call failed', { status: res.status });
 
-        return [];
+        if (noSegmentsOnError) return [];
+        else throw new Error(`getUserSegments API call failed: ${res.status}`);
       }
 
       const data = (await res.json()) as { status: string; data: string[] };
@@ -140,12 +143,16 @@ export class VeridiaClient {
         data: data,
       });
 
-      return [];
+      if (noSegmentsOnError) return [];
+      else
+        throw new Error(`getUserSegments API returned invalid response: ${JSON.stringify(data)}`);
     } catch (err) {
       this.logger?.error('segments', 'getUserSegments encountered an error', {
         error: err,
       });
-      return [];
+
+      if (noSegmentsOnError) return [];
+      else throw err;
     }
   }
 

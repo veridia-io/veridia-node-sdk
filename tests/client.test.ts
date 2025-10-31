@@ -257,6 +257,38 @@ describe('Veridia Client', () => {
         { error: abortError },
       );
     });
+
+    it('logs and throws an error when response is not ok', async () => {
+      vi.mocked(httpFetch).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      } as any);
+
+      const client = new VeridiaClient(segmentCredentials);
+
+      await expect(client.getUserSegments('userId', 'user-123', false)).rejects.toThrow();
+    });
+
+    it('logs invalid payloads and throws an error', async () => {
+      vi.mocked(httpFetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'oops' }),
+      } as any);
+
+      const client = new VeridiaClient(segmentCredentials);
+
+      await expect(client.getUserSegments('userId', 'user-123', false)).rejects.toThrow();
+    });
+
+    it('throws an error when fetch rejects and logs the error', async () => {
+      const abortError = new DOMException('Aborted', 'AbortError');
+      vi.mocked(httpFetch).mockRejectedValueOnce(abortError);
+
+      const client = new VeridiaClient(segmentCredentials);
+
+      await expect(client.getUserSegments('userId', 'user-123', false)).rejects.toThrow();
+    });
   });
 
   describe('close', () => {
