@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VeridiaClient } from '../src/client';
 import { httpFetch } from '../src/http';
+import type { VeridiaLogger } from '../src/types';
 
 vi.mock('../src/http', () => ({
   httpFetch: vi.fn(),
@@ -94,6 +95,65 @@ describe('Veridia Client', () => {
         expect.any(Object),
       );
     });
+  });
+
+  it('retries flushes, logs failures, and only flushes newly queued data after recovery', async () => {
+    vi.useFakeTimers();
+
+    const logger: VeridiaLogger = {
+      error: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    const client = new VeridiaClient({
+      ...credentials,
+      retries: 2,
+      retryBaseDelayMs: 50,
+      logger,
+    });
+
+    const terminalError = new Error('terminal failure');
+    vi.mocked(httpFetch).mockRejectedValue(terminalError);
+
+    try {
+      client.track('userId', 'u3', 'signup', 'evt-1', '2024-01-01T00:00:00.000Z', {
+        plan: 'basic',
+      });
+
+      const flushPromise = client.flush();
+      const rejectionAssertion = expect(flushPromise).rejects.toBe(terminalError);
+
+      await vi.runAllTimersAsync();
+
+      await rejectionAssertion;
+
+      expect(logger.error).toHaveBeenCalledWith('events', 'flush failed after max retries', {
+        error: terminalError,
+      });
+
+      vi.mocked(httpFetch).mockClear();
+      vi.mocked(httpFetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: 'success' }),
+      } as any);
+
+      client.track('userId', 'u3', 'signup', 'evt-2', '2024-01-02T00:00:00.000Z', { plan: 'pro' });
+
+      await client.flush();
+
+      expect(vi.mocked(httpFetch)).toHaveBeenCalledTimes(1);
+      const [, requestInit] = vi.mocked(httpFetch).mock.calls[0];
+      const parsedBody = JSON.parse((requestInit as RequestInit).body as string);
+
+      expect(parsedBody.events).toEqual([
+        expect.objectContaining({ eventId: 'evt-2', properties: { plan: 'pro' } }),
+      ]);
+    } finally {
+      vi.useRealTimers();
+      vi.mocked(httpFetch).mockReset();
+      vi.clearAllMocks();
+    }
   });
 
   describe('getUserSegments', () => {
