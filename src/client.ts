@@ -183,12 +183,12 @@ export class VeridiaClient {
   private scheduleFlushIfNeeded(service: string, buffer: unknown[]): void {
     if (buffer.length >= this.maxBufferSize) {
       this.flush().catch((error) => {
-        this.logger?.error(service, 'automatic flush failed', { error });
+        this.logger?.error('flush', 'automatic flush failed', { error });
       });
     } else if (!this.flushTimer) {
       this.flushTimer = setTimeout(() => {
         this.flush().catch((error) => {
-          this.logger?.error(service, 'automatic flush failed', { error });
+          this.logger?.error('flush', 'automatic flush failed', { error });
         });
       }, this.maxBufferTimeMs);
     }
