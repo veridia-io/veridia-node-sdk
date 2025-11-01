@@ -259,7 +259,7 @@ describe('Veridia Client', () => {
     });
 
     it('logs successful flushes when an info logger is provided', async () => {
-      const logger: VeridiaLogger = { info: vi.fn() };
+      const logger: VeridiaLogger = { info: vi.fn(), error: vi.fn() };
       const client = new VeridiaClient({ ...credentials, autoFlush: false, logger });
 
       client.track(
