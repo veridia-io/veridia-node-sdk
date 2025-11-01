@@ -1,9 +1,9 @@
 # Veridia Node SDK
 
-[![npm version](https://img.shields.io/npm/v/@veridia/node-sdk.svg)](https://www.npmjs.com/package/@veridia/node-sdk)
-
 Official Node.js SDK for integrating with the [Veridia Platform](https://veridia.io).  
 It provides an easy way to identify users, send tracking events, retrieve user segments, and manage batching with retries and timeouts — all from your backend.
+
+[![npm version](https://img.shields.io/npm/v/@veridia/node-sdk.svg)](https://www.npmjs.com/package/@veridia/node-sdk)
 
 ---
 
