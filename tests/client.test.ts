@@ -70,6 +70,8 @@ describe('Veridia Client', () => {
         amount: 1,
       });
 
+      await vi.advanceTimersByTimeAsync(5);
+
       expect(httpFetch).toHaveBeenCalledTimes(1);
       expect(httpFetch).toHaveBeenCalledWith(
         expect.stringContaining('/events'),

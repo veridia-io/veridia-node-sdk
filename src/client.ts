@@ -166,10 +166,8 @@ export class VeridiaClient {
       this.flushTimer = undefined;
     }
 
-    await Promise.all([
-      this.flushBatch('profiles', this.identifyBuffer),
-      this.flushBatch('events', this.trackBuffer),
-    ]);
+    await this.flushBatch('profiles', this.identifyBuffer);
+    await this.flushBatch('events', this.trackBuffer);
   }
 
   /**
