@@ -121,6 +121,59 @@ describe('Veridia Client', () => {
 
       expect(httpFetch).not.toHaveBeenCalled();
     });
+
+    it('logs automatic flush errors when triggered by buffer size', async () => {
+      const logger: VeridiaLogger = { error: vi.fn() };
+      const client = new VeridiaClient({ ...smallBufferOptions, logger });
+      const failure = new Error('buffer auto flush failed');
+      const flushSpy = vi.spyOn(client as any, 'flush').mockRejectedValue(failure);
+
+      client.track(
+        'userId',
+        'buffer-failure',
+        'auto-event',
+        'evt-auto-fail',
+        new Date().toISOString(),
+        {
+          amount: 1,
+        },
+      );
+
+      const flushPromise = flushSpy.mock.results[0]?.value as Promise<unknown> | undefined;
+      expect(flushPromise).toBeInstanceOf(Promise);
+      await flushPromise!.catch(() => {});
+
+      expect(logger.error).toHaveBeenCalledWith('flush', 'automatic flush failed', {
+        error: failure,
+      });
+
+      flushSpy.mockRestore();
+    });
+
+    it('logs automatic flush errors when triggered by timer', async () => {
+      const logger: VeridiaLogger = { error: vi.fn() };
+      const client = new VeridiaClient({
+        ...smallBufferOptions,
+        logger,
+        maxBufferSize: 2,
+      });
+      const failure = new Error('timer auto flush failed');
+      const flushSpy = vi.spyOn(client as any, 'flush').mockRejectedValue(failure);
+
+      client.identify('userId', 'timer-failure', { email: 'timer@example.com' });
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      const flushPromise = flushSpy.mock.results[0]?.value as Promise<unknown> | undefined;
+      expect(flushPromise).toBeInstanceOf(Promise);
+      await flushPromise!.catch(() => {});
+
+      expect(logger.error).toHaveBeenCalledWith('flush', 'automatic flush failed', {
+        error: failure,
+      });
+
+      flushSpy.mockRestore();
+    });
   });
 
   it('retries flushes, logs failures, and only flushes newly queued data after recovery', async () => {
@@ -180,6 +233,46 @@ describe('Veridia Client', () => {
       vi.mocked(httpFetch).mockReset();
       vi.clearAllMocks();
     }
+  });
+
+  describe('flush', () => {
+    it('throws when the API responds with a non-ok status', async () => {
+      vi.mocked(httpFetch).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      } as any);
+
+      const client = new VeridiaClient({ ...credentials, autoFlush: false, retries: 1 });
+
+      client.track(
+        'userId',
+        'flush-failure',
+        'signup',
+        'evt-flush-failure',
+        new Date().toISOString(),
+        {},
+      );
+
+      await expect(client.flush()).rejects.toThrow('events flush failed: 500');
+    });
+
+    it('logs successful flushes when an info logger is provided', async () => {
+      const logger: VeridiaLogger = { info: vi.fn() };
+      const client = new VeridiaClient({ ...credentials, autoFlush: false, logger });
+
+      client.track(
+        'userId',
+        'flush-success',
+        'signup',
+        'evt-flush-success',
+        new Date().toISOString(),
+        {},
+      );
+
+      await client.flush();
+
+      expect(logger.info).toHaveBeenCalledWith('events', 'flush completed', { batchSize: 1 });
+    });
   });
 
   describe('getUserSegments', () => {
