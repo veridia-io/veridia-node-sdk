@@ -105,11 +105,11 @@ export class VeridiaClient {
   ): Promise<string[]> {
     try {
       const path = `/segments/${identifierType}/${encodeURIComponent(identifierId)}`;
-      const url = `${this.baseUrl}${path}`;
+      const url = new URL(`${this.baseUrl}${path}`);
 
       const req: aws4.Request = {
-        host: new URL(url).host,
-        path,
+        host: url.host,
+        path: url.pathname,
         method: 'GET',
         service: 'segments',
         region: this.region,
@@ -121,7 +121,7 @@ export class VeridiaClient {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMsGetUserSegments);
 
-      const res = await fetch(url, {
+      const res = await fetch(url.toString(), {
         method: req.method,
         headers: req.headers as Record<string, string>,
         signal: controller.signal,
