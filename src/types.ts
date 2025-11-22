@@ -31,9 +31,15 @@ export type VeridiaLogger = {
   error: (service: string, message: string, context?: VeridiaLogContext) => void;
 };
 
-export type VeridiaClientOptions = {
+export type VeridiaClientCredentials = {
   accessKeyId: string;
   secretAccessKey: string;
+  sessionToken?: string;
+  expiration?: Date;
+};
+
+export type VeridiaClientOptions = {
+  credentials: VeridiaClientCredentials;
   endpoint?: string; // default: https://api.veridia.io/v1
   region?: string; // default: "default"
   autoFlush?: boolean; // default: true

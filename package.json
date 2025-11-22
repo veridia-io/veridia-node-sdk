@@ -23,11 +23,11 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "aws4": "1.13.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "@aws-sdk/signature-v4": "^3.374.0",
+    "@aws-crypto/sha256-js": "^5.2.0"
   },
   "devDependencies": {
-    "@types/aws4": "^1.11.6",
     "@types/node": "^24.9.2",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",

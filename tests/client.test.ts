@@ -7,7 +7,7 @@ vi.mock('../src/http', () => ({
   httpFetch: vi.fn(),
 }));
 
-const credentials = { accessKeyId: 'key', secretAccessKey: 'secret' };
+const clientOptions = { credentials: { accessKeyId: 'key', secretAccessKey: 'secret' } };
 
 describe('Veridia Client', () => {
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('Veridia Client', () => {
   });
 
   it('buffers and flushes identify calls', async () => {
-    const client = new VeridiaClient(credentials);
+    const client = new VeridiaClient(clientOptions);
 
     client.identify('userId', 'u1', { email: 'a@b.com' });
     await client.flush();
@@ -32,7 +32,7 @@ describe('Veridia Client', () => {
   });
 
   it('buffers and flushes track calls', async () => {
-    const client = new VeridiaClient(credentials);
+    const client = new VeridiaClient(clientOptions);
 
     client.track('userId', 'u2', 'purchase', 'evt-1', new Date().toISOString(), { amount: 10 });
     await client.flush();
@@ -42,7 +42,7 @@ describe('Veridia Client', () => {
 
   describe('automatic flushing', () => {
     const smallBufferOptions = {
-      ...credentials,
+      ...clientOptions,
       maxBufferSize: 1,
       maxBufferTimeMs: 25,
     } as const;
@@ -187,7 +187,7 @@ describe('Veridia Client', () => {
     };
 
     const client = new VeridiaClient({
-      ...credentials,
+      ...clientOptions,
       retries: 2,
       retryBaseDelayMs: 50,
       logger,
@@ -238,13 +238,52 @@ describe('Veridia Client', () => {
   });
 
   describe('flush', () => {
+    it('signs the flush events request with AWS SigV4', async () => {
+      const client = new VeridiaClient({ ...clientOptions, autoFlush: false });
+
+      client.track('userId', 'sig-test', 'signup', 'evt-sig-test', new Date().toISOString(), {});
+
+      await client.flush();
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = vi.mocked(httpFetch).mock.calls[0];
+
+      // SigV4 header checks
+      expect(init.headers['authorization']).toMatch(/^AWS4-HMAC-SHA256/);
+      expect(init.headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
+
+      expect(url).toContain('/events');
+    });
+
+    it('signs the flush events request with AWS SigV4 session', async () => {
+      const client = new VeridiaClient({
+        ...clientOptions,
+        credentials: { ...clientOptions.credentials, sessionToken: '12345' },
+        autoFlush: false,
+      });
+
+      client.track('userId', 'sig-test', 'signup', 'evt-sig-test', new Date().toISOString(), {});
+
+      await client.flush();
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = vi.mocked(httpFetch).mock.calls[0];
+
+      // SigV4 header checks
+      expect(init.headers['authorization']).toMatch(/^AWS4-HMAC-SHA256/);
+      expect(init.headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
+      expect(init.headers['x-amz-security-token']).toBe('12345');
+
+      expect(url).toContain('/events');
+    });
+
     it('throws when the API responds with a non-ok status', async () => {
       vi.mocked(httpFetch).mockResolvedValueOnce({
         ok: false,
         status: 500,
       } as any);
 
-      const client = new VeridiaClient({ ...credentials, autoFlush: false, retries: 1 });
+      const client = new VeridiaClient({ ...clientOptions, autoFlush: false, retries: 1 });
 
       client.track(
         'userId',
@@ -260,7 +299,7 @@ describe('Veridia Client', () => {
 
     it('logs successful flushes when an info logger is provided', async () => {
       const logger: VeridiaLogger = { info: vi.fn(), error: vi.fn() };
-      const client = new VeridiaClient({ ...credentials, autoFlush: false, logger });
+      const client = new VeridiaClient({ ...clientOptions, autoFlush: false, logger });
 
       client.track(
         'userId',
@@ -279,7 +318,7 @@ describe('Veridia Client', () => {
 
   describe('getUserSegments', () => {
     const segmentCredentials = {
-      ...credentials,
+      ...clientOptions,
       logger: { error: vi.fn() },
     };
 
@@ -291,6 +330,48 @@ describe('Veridia Client', () => {
         status: 200,
         json: async () => ({ status: 'success', data: ['seg-1', 'seg-2'] }),
       } as any);
+    });
+
+    it('signs the getUserSegments request with AWS SigV4', async () => {
+      const client = new VeridiaClient(segmentCredentials);
+
+      await client.getUserSegments('userId', 'user-123');
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = vi.mocked(httpFetch).mock.calls[0];
+
+      expect(init).toBeDefined();
+      expect(init.headers).toBeDefined();
+
+      // Signature headers MUST exist
+      expect(init.headers['authorization']).toMatch(/^AWS4-HMAC-SHA256/);
+      expect(init.headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
+
+      // URL must contain signature query signing
+      expect(url).toContain('/segments');
+    });
+
+    it('signs the getUserSegments request with AWS SigV4 session', async () => {
+      const client = new VeridiaClient({
+        ...segmentCredentials,
+        credentials: { ...segmentCredentials.credentials, sessionToken: '12345' },
+      });
+
+      await client.getUserSegments('userId', 'user-123');
+
+      expect(httpFetch).toHaveBeenCalledTimes(1);
+      const [url, init] = vi.mocked(httpFetch).mock.calls[0];
+
+      expect(init).toBeDefined();
+      expect(init.headers).toBeDefined();
+
+      // Signature headers MUST exist
+      expect(init.headers['authorization']).toMatch(/^AWS4-HMAC-SHA256/);
+      expect(init.headers['x-amz-date']).toMatch(/^\d{8}T\d{6}Z$/);
+      expect(init.headers['x-amz-security-token']).toBe('12345');
+
+      // URL must contain signature query signing
+      expect(url).toContain('/segments');
     });
 
     it('returns the segments when the API responds with success', async () => {
@@ -388,7 +469,7 @@ describe('Veridia Client', () => {
 
   describe('close', () => {
     it('flushes pending identify and track buffers', async () => {
-      const client = new VeridiaClient({ ...credentials, maxBufferTimeMs: 60_000 });
+      const client = new VeridiaClient({ ...clientOptions, maxBufferTimeMs: 60_000 });
 
       client.identify('userId', 'u-close-1', { email: 'close@example.com' });
       client.track(
@@ -418,7 +499,7 @@ describe('Veridia Client', () => {
       const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
       const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
 
-      const client = new VeridiaClient({ ...credentials, maxBufferTimeMs: 60_000 });
+      const client = new VeridiaClient({ ...clientOptions, maxBufferTimeMs: 60_000 });
 
       client.identify('userId', 'u-close-2', { email: 'close2@example.com' });
 
@@ -439,7 +520,7 @@ describe('Veridia Client', () => {
       vi.mocked(httpFetch).mockRejectedValueOnce(error);
 
       const client = new VeridiaClient({
-        ...credentials,
+        ...clientOptions,
         maxBufferTimeMs: 60_000,
         retries: 1,
       });

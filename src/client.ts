@@ -1,9 +1,11 @@
-import * as aws4 from 'aws4';
+import { Sha256 } from '@aws-crypto/sha256-js';
+import { SignatureV4 } from '@aws-sdk/signature-v4';
 import { httpFetch as fetch } from './http.js';
 import {
   IdentifierPayload,
   IdentifyPayload,
   TrackPayload,
+  VeridiaClientCredentials,
   VeridiaClientOptions,
   VeridiaLogger,
 } from './types.js';
@@ -15,6 +17,7 @@ export class VeridiaClient {
   private flushTimer?: NodeJS.Timeout;
 
   private readonly logger: VeridiaLogger | undefined;
+  private readonly credentials: VeridiaClientCredentials;
   private readonly baseUrl: string;
   private readonly region: string;
   private readonly autoFlush: boolean;
@@ -25,7 +28,7 @@ export class VeridiaClient {
   private readonly timeoutMsGetUserSegments: number;
   private readonly timeoutMsFlush: number;
 
-  constructor(private readonly options: VeridiaClientOptions) {
+  constructor(options: VeridiaClientOptions) {
     this.baseUrl = options.endpoint ?? 'https://api.veridia.io/v1';
     this.region = options.region ?? 'default';
     this.autoFlush = options.autoFlush ?? true;
@@ -36,6 +39,7 @@ export class VeridiaClient {
     this.timeoutMsGetUserSegments = options.timeoutMsGetUserSegments ?? 5_000;
     this.timeoutMsFlush = options.timeoutMsFlush ?? 30_000;
     this.logger = options.logger;
+    this.credentials = options.credentials;
   }
 
   /**
@@ -107,23 +111,29 @@ export class VeridiaClient {
       const path = `/segments/${identifierType}/${encodeURIComponent(identifierId)}`;
       const url = new URL(`${this.baseUrl}${path}`);
 
-      const req: aws4.Request = {
-        host: url.host,
-        path: url.pathname,
-        method: 'GET',
-        service: 'segments',
+      const signer = new SignatureV4({
+        credentials: this.credentials,
         region: this.region,
-        headers: { 'User-Agent': `veridia-node-sdk/${SDK_VERSION}` },
-      };
+        service: 'segments',
+        sha256: Sha256,
+      });
 
-      aws4.sign(req, this.options);
+      const signed = await signer.sign({
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port !== '' ? +url.port : undefined,
+        path: url.pathname,
+        query: Object.fromEntries(url.searchParams.entries()),
+        method: 'GET',
+        headers: { Host: url.host, 'User-Agent': `veridia-node-sdk/${SDK_VERSION}` },
+      });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMsGetUserSegments);
 
       const res = await fetch(url.toString(), {
-        method: req.method,
-        headers: req.headers as Record<string, string>,
+        method: signed.method,
+        headers: signed.headers,
         signal: controller.signal,
       }).finally(() => clearTimeout(timeout));
 
@@ -200,26 +210,27 @@ export class VeridiaClient {
 
     const urlObj = new URL(this.baseUrl + '/' + service);
 
-    const opts: aws4.Request = {
-      host: urlObj.host,
-      path: urlObj.pathname + urlObj.search,
+    const signer = new SignatureV4({
+      credentials: this.credentials,
+      region: this.region,
+      service,
+      sha256: Sha256,
+    });
+
+    const signed = await signer.sign({
+      protocol: urlObj.protocol,
+      hostname: urlObj.hostname,
+      port: urlObj.port !== '' ? +urlObj.port : undefined,
+      path: urlObj.pathname,
+      query: Object.fromEntries(urlObj.searchParams.entries()),
       method: 'POST',
       headers: {
+        Host: urlObj.host,
         'Content-Type': 'application/json',
         'User-Agent': `veridia-node-sdk/${SDK_VERSION}`,
       },
       body: JSON.stringify({ [service]: batch }),
-      service,
-      region: this.region,
-    };
-
-    aws4.sign(opts, this.options);
-
-    const signedOpts = {
-      method: opts.method,
-      headers: opts.headers as Record<string, string>,
-      body: opts.body as any,
-    };
+    });
 
     for (let attempt = 1; attempt <= this.retries; attempt++) {
       try {
@@ -227,7 +238,9 @@ export class VeridiaClient {
         const timeout = setTimeout(() => controller.abort(), this.timeoutMsFlush);
 
         const res = await fetch(urlObj.toString(), {
-          ...signedOpts,
+          method: signed.method,
+          headers: signed.headers,
+          body: signed.body,
           signal: controller.signal,
         }).finally(() => clearTimeout(timeout));
 
