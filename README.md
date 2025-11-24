@@ -29,8 +29,10 @@ yarn add @veridia/node-sdk
 import { VeridiaClient } from '@veridia/node-sdk';
 
 const client = new VeridiaClient({
-  accessKeyId: 'your-access-key-id',
-  secretAccessKey: 'your-secret-access-key',
+  credentials: {
+    accessKeyId: 'your-access-key-id',
+    secretAccessKey: 'your-secret-access-key',
+  },
   logger: {
     error: (service, msg, ctx) => console.error(`[ERROR] ${service}: ${msg}`, ctx),
     warn: (service, msg, ctx) => console.warn(`[WARN] ${service}: ${msg}`, ctx),
@@ -45,8 +47,10 @@ const client = new VeridiaClient({
 const { VeridiaClient } = require('@veridia/node-sdk');
 
 const client = new VeridiaClient({
-  accessKeyId: 'your-access-key-id',
-  secretAccessKey: 'your-secret-access-key',
+  credentials: {
+    accessKeyId: 'your-access-key-id',
+    secretAccessKey: 'your-secret-access-key',
+  },
   logger: { error: console.error },
 });
 ```
@@ -186,8 +190,10 @@ import pino from 'pino';
 const log = pino();
 
 const client = new VeridiaClient({
-  accessKeyId: '...',
-  secretAccessKey: '...',
+  credentials: {
+    accessKeyId: 'your-access-key-id',
+    secretAccessKey: 'your-secret-access-key',
+  },
   logger: {
     info: (s, m, c) => log.info({ service: s, context: c }, m),
     warn: (s, m, c) => log.warn({ service: s, context: c }, m),
@@ -211,8 +217,10 @@ Hover over any method in VS Code to see inline descriptions and parameter hints.
 import { VeridiaClient } from '@veridia/node-sdk';
 
 const client = new VeridiaClient({
-  accessKeyId: 'test',
-  secretAccessKey: 'test',
+  credentials: {
+    accessKeyId: 'your-access-key-id',
+    secretAccessKey: 'your-secret-access-key',
+  },
   logger: { error: console.error },
 });
 
