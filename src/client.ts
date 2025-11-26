@@ -74,6 +74,7 @@ export class VeridiaClient {
    * @param eventId - Unique ID for idempotency.
    * @param eventTime - ISO timestamp string.
    * @param properties - Arbitrary event properties.
+   * @param tenantId - Tenant ID is used in internal systems and should not be used by clients.
    */
   public track(
     identifierType: IdentifierPayload['type'],
@@ -82,8 +83,10 @@ export class VeridiaClient {
     eventId: TrackPayload['eventId'],
     eventTime: TrackPayload['eventTime'],
     properties: TrackPayload['properties'],
+    tenantId?: string,
   ): void {
     this.trackBuffer.push({
+      tenantId,
       identifier: { type: identifierType, id: identifierId },
       eventId,
       eventType,

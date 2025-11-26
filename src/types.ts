@@ -63,6 +63,7 @@ export type IdentifyPayload = {
 };
 
 export type TrackPayload = {
+  tenantId?: string;
   identifier: IdentifierPayload;
   eventId: string;
   eventType: string;
