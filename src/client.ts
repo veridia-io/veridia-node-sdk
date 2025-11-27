@@ -1,5 +1,5 @@
 import { Sha256 } from '@aws-crypto/sha256-js';
-import { SignatureV4 } from '@aws-sdk/signature-v4';
+import { SignatureV4 } from '@smithy/signature-v4';
 import { httpFetch as fetch } from './http.js';
 import {
   IdentifierPayload,
