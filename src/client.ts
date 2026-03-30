@@ -170,6 +170,91 @@ export class VeridiaClient {
   }
 
   /**
+   * Retrieves recommendations for the given user based on a strategy.
+   * @param strategyId - The ID of the recommendation strategy.
+   * @param identifierType - The type of user identifier ("userId" | "email").
+   * @param identifierId - The unique ID or email.
+   * @param [noRecommendationsOnError=true] - Whether to throw an error or return empty array. Defaults to true.
+   * @returns A list of recommended item identifiers for the user.
+   */
+  public async getUserRecommendations(
+    strategyId: string,
+    identifierType: IdentifierPayload['type'],
+    identifierId: string,
+
+    noRecommendationsOnError = true,
+  ): Promise<string[]> {
+    try {
+      const path = `/recommendations/${strategyId}/${identifierType}/${encodeURIComponent(identifierId)}`;
+      const url = new URL(`${this.baseUrl}${path}`);
+
+      const signer = new SignatureV4({
+        credentials: this.credentials,
+        region: this.region,
+        service: 'recommendations',
+        sha256: Sha256,
+      });
+
+      const signed = await signer.sign({
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port !== '' ? +url.port : undefined,
+        path: url.pathname,
+        query: Object.fromEntries(url.searchParams.entries()),
+        method: 'GET',
+        headers: { Host: url.host, 'User-Agent': `veridia-node-sdk/${SDK_VERSION}` },
+      });
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMsGetUserSegments);
+
+      const res = await fetch(url.toString(), {
+        method: signed.method,
+        headers: signed.headers,
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+
+      if (!res.ok) {
+        this.logger?.error('recommendations', 'getUserRecommendations API call failed', {
+          status: res.status,
+          strategyId,
+        });
+
+        if (noRecommendationsOnError) return [];
+        else throw new Error(`getUserRecommendations API call failed: ${res.status}`);
+      }
+
+      const data = (await res.json()) as { status: string; data: string[] };
+      if (data.status === 'success' && Array.isArray(data.data)) {
+        return data.data;
+      }
+
+      this.logger?.error(
+        'recommendations',
+        'getUserRecommendations API returned invalid response',
+        {
+          data: data,
+          strategyId,
+        },
+      );
+
+      if (noRecommendationsOnError) return [];
+      else
+        throw new Error(
+          `getUserRecommendations API returned invalid response: ${JSON.stringify(data)}`,
+        );
+    } catch (err) {
+      this.logger?.error('recommendations', 'getUserRecommendations encountered an error', {
+        error: err,
+        strategyId,
+      });
+
+      if (noRecommendationsOnError) return [];
+      else throw err;
+    }
+  }
+
+  /**
    * Sends all queued identify and track data to the Veridia API immediately.
    * Automatically called when buffers reach their limit or after the configured time interval.
    */
