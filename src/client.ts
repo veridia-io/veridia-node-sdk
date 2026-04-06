@@ -53,8 +53,10 @@ export class VeridiaClient {
     identifierType: IdentifierPayload['type'],
     identifierId: IdentifierPayload['id'],
     attributes: IdentifyPayload['attributes'],
+    tenantId?: string,
   ): void {
     this.identifyBuffer.push({
+      tenantId,
       identifier: {
         type: identifierType,
         id: identifierId,

@@ -58,6 +58,7 @@ export type IdentifierPayload = {
 };
 
 export type IdentifyPayload = {
+  tenantId?: string;
   identifier: IdentifierPayload;
   attributes: any;
 };
