@@ -27,6 +27,7 @@ export class VeridiaClient {
   private readonly retryBaseDelayMs: number;
   private readonly timeoutMsGetUserSegments: number;
   private readonly timeoutMsFlush: number;
+  private readonly dryRun: boolean | undefined;
 
   constructor(options: VeridiaClientOptions) {
     this.baseUrl = options.endpoint ?? 'https://api.veridia.io/v1';
@@ -40,6 +41,7 @@ export class VeridiaClient {
     this.timeoutMsFlush = options.timeoutMsFlush ?? 30_000;
     this.logger = options.logger;
     this.credentials = options.credentials;
+    this.dryRun = options.dryRun;
   }
 
   /**
@@ -299,6 +301,9 @@ export class VeridiaClient {
     buffer.length = 0; // clear buffer safely
 
     const urlObj = new URL(this.baseUrl + '/' + service);
+    if (this.dryRun) {
+      urlObj.searchParams.set('dryRun', 'true');
+    }
 
     const signer = new SignatureV4({
       credentials: this.credentials,

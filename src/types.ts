@@ -50,6 +50,7 @@ export type VeridiaClientOptions = {
   timeoutMsGetUserSegments?: number; // default 5000
   timeoutMsFlush?: number; // default 30000
   logger?: VeridiaLogger;
+  dryRun?: boolean;
 };
 
 export type IdentifierPayload = {
