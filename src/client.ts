@@ -50,12 +50,15 @@ export class VeridiaClient {
    * @param identifierType - The type of user identifier ("userId" | "email").
    * @param identifierId - The unique ID or email.
    * @param attributes - Key/value map of user attributes.
+   * @param tenantId - Internal parameter not to be used in production.
+   * @param backfillPending - Freeze/unfreeze segments evaluation for user to backfill their events.
    */
   public identify(
     identifierType: IdentifierPayload['type'],
     identifierId: IdentifierPayload['id'],
     attributes: IdentifyPayload['attributes'],
     tenantId?: string,
+    backfillPending?: boolean,
   ): void {
     this.identifyBuffer.push({
       tenantId,
@@ -64,6 +67,7 @@ export class VeridiaClient {
         id: identifierId,
       },
       attributes,
+      backfillPending,
     });
 
     if (this.autoFlush) this.scheduleFlushIfNeeded('profiles', this.identifyBuffer);

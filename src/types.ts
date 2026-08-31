@@ -62,6 +62,7 @@ export type IdentifyPayload = {
   tenantId?: string;
   identifier: IdentifierPayload;
   attributes: any;
+  backfillPending?: boolean;
 };
 
 export type TrackPayload = {
